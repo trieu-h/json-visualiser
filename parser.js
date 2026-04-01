@@ -44,7 +44,7 @@ function parse_bool() {
     return "false";
   }
 
-  throw(`Invalid token at ${pos}`);
+  throw new Error(`Invalid token at ${pos}`);
 }
 
 function parse_array() {
@@ -107,7 +107,7 @@ function parse_value() {
 
 function expect(char, msg) {
   if (json[pos] !== char) {
-    throw(msg || `Expected ${char} but got ${json[pos]} instead at ${pos}`);
+    throw new Error(msg || `Expected ${char} but got ${json[pos]} instead at ${pos}`);
   } else {
     pos++;
   }
@@ -146,16 +146,16 @@ function parse_object() {
 
 let json = null;
 
-async function main() {
-  const args = Bun.argv
-  const path = args[2];
-  if (!path) {
-    console.error("Please provide file path as an argument");
-    process.exit(1);
-  }
-  const file = Bun.file(path);
-  json = await file.text();
-  console.log(parse_object(json));
-}
-
-await main();
+// async function main() {
+//   const args = Bun.argv
+//   const path = args[2];
+//   if (!path) {
+//     console.error("Please provide file path as an argument");
+//     return;
+//   }
+//   const file = Bun.file(path);
+//   json = await file.text();
+//   console.log(parse_object(json));
+// }
+//
+// await main();
