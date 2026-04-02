@@ -4,11 +4,17 @@ if (!ctx) throw("Error: Could not initialize 2d context");
 
 let graph;
 
-let MAX_ITERATIONS = 1000;
-let step = 1 / MAX_ITERATIONS;
-let EPSILON = 10;
+const POINT_COLOR = "#dc322f";
+const TEXT_COLOR  = "#839496";
+const LINE_COLOR  = "#93a1a1";
+const BOX_COLOR   = "#fdf6e3";
+const MAX_ITERATIONS = 1000;
+const STEP = 1 / MAX_ITERATIONS;
+const EPSILON = 10;
 let RADIUS = 10;
-let IDEAL_DISTANCE = 100;
+let IDEAL_DISTANCE = 50;
+let FONT_SIZE = 15;
+let BOX_PADDING = 10;
 
 function lerp(x, y, t) {
   return x + (y - x) * t;
@@ -18,7 +24,7 @@ function drawLine(startPos, endPos, lineWidth = 1) {
   ctx.beginPath();
   ctx.moveTo(startPos.x, startPos.y);
   ctx.lineTo(endPos.x, endPos.y);
-  ctx.strokeStyle = "#93a1a1";
+  ctx.strokeStyle = LINE_COLOR;
   ctx.lineWidth = lineWidth;
   ctx.stroke();
 }
@@ -37,13 +43,13 @@ function connectCircle(pos1, r1, pos2, r2) {
 }
 
 function drawRect(pos, w, h) {
-  ctx.fillStyle = "#fdf6e3";
+  ctx.fillStyle = BOX_COLOR;
   ctx.fillRect(pos.x, pos.y, w, h);
 }
 
 function drawText(text, x, y) {
-  ctx.font = "15px serif";
-  ctx.fillStyle = "#839496";
+  ctx.font = `${FONT_SIZE}px serif`;
+  ctx.fillStyle = TEXT_COLOR;
   ctx.fillText(text, x, y);
 }
 
@@ -64,6 +70,10 @@ let speed = 0.0002;
 let iteration = 0;
 let mousePos = {x: 0, y: 0};
 let nodes = [];
+let originX = 0;
+let originY = 0;
+let scale = 1;
+let zoom = 0;
 
 function frame() {
   nodes = [];
@@ -73,88 +83,64 @@ function frame() {
   }
   prev_time = cur_time;
 
+  ctx.setTransform(1, 0, 0, 1, 0, 0); // Reset everything to default state
   ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.translate(originX, originY);
+  ctx.scale(scale, scale);
 
   const draw = (node, parent) => {
-    if (node.type === "object") {
-      node.adjacents = [];
-      nodes.push(node);
+    node.adjacents = [];
+    nodes.push(node);
 
-      const texts = [];
-      for (let [k, v] of Object.entries(node.value)) {
-        if (isObject(v)) {
-          v = `[${Object.values(v.value).length} items]`;
-        } else if (Array.isArray(v)) {
-          v = `[${v.length} items]`;
-        }
+    drawCircle(ctx, node.position, RADIUS, POINT_COLOR);
 
-        texts.push(`${k}: ${v}`);
-      }
-
-      const padding = 10;
-      const max_text_w = Math.max(...texts.map(t => ctx.measureText(t).width)) + padding * 2;
-      const max_text_h = texts.length * 15 + padding * 2;
-
-      drawCircle(ctx, node.position, RADIUS, "red");
-
-      if (node.is_hovered) {
-        drawRect({x: node.position.x - padding, y: node.position.y - padding}, max_text_w, max_text_h);
-        y_pos = node.position.y + 15;
-        for (const text of texts) {
-          drawText(text, node.position.x, y_pos);
-          y_pos += 15;
-        }
-      }
-
-      for (const value of Object.values(node.value)) {
-        if (value.type === "object" || value.type === "array") {
-          draw(value, node);
-          connectCircle(node.position, RADIUS, value.position, RADIUS);
-          node.adjacents.push(value);
-        }
-      }
-    }
-
-    if (node.type === "array") {
-      node.adjacents = [];
-      nodes.push(node);
-
-      const texts = [];
-      for (const value of node.value) {
-        if (isObject(value)) {
-          value = `[${Object.values(value.value).length} items]`;
-        } else if (Array.isArray(value)) {
-          value = `[${value.length} items]`;
-        }
-
-        texts.push(value);
-      }
-
-      const padding = 10;
-      const max_text_w = Math.max(...texts.map(t => ctx.measureText(t).width)) + padding * 2;
-      const max_text_h = texts.length * 15 + padding * 2;
-      drawCircle(ctx, node.position, RADIUS, "red");
-
-      if (node.is_hovered) {
-        drawRect({x: node.position.x - padding, y: node.position.y - padding}, max_text_w, max_text_h);
-        y_pos = node.position.y + 15;
-        for (const text of texts) {
-          drawText(text, node.position.x, y_pos);
-          y_pos += 15;
-        }
-      }
-
-      for (const value of Object.values(node.value)) {
-        if (value.type === "object" || value.type === "array") {
-          draw(value, node);
-          connectCircle(node.position, RADIUS, value.position, RADIUS);
-          node.adjacents.push(value);
-        }
+    for (const value of Object.values(node.value)) {
+      if (value.type === "object" || value.type === "array") {
+        draw(value, node);
+        connectCircle(node.position, RADIUS, value.position, RADIUS);
+        node.adjacents.push(value);
       }
     }
   }
 
   draw(graph);
+
+  for (const node of nodes) {
+    if (node.is_hovered) {
+      const texts = [];
+
+      if (node.type === "array") {
+        for (const value of node.value) {
+          if (isObject(value)) {
+            value = `[${Object.values(value.value).length} items]`;
+          } else if (Array.isArray(value)) {
+            value = `[${value.length} items]`;
+          }
+
+          texts.push(value);
+        }
+      } else if (node.type === "object") {
+        for (let [k, v] of Object.entries(node.value)) {
+          if (isObject(v)) {
+            v = `[${Object.values(v.value).length} items]`;
+          } else if (Array.isArray(v)) {
+            v = `[${v.length} items]`;
+          }
+
+          texts.push(`${k}: ${v}`);
+        }
+      }
+
+      const max_text_w = Math.max(...texts.map(t => ctx.measureText(t).width)) + BOX_PADDING * 2;
+      const max_text_h = texts.length * FONT_SIZE + BOX_PADDING * 2;
+      drawRect({x: node.position.x, y: node.position.y}, max_text_w, max_text_h);
+      y_pos = node.position.y + FONT_SIZE + BOX_PADDING;
+      for (const text of texts) {
+        drawText(text, node.position.x + BOX_PADDING, y_pos);
+        y_pos += FONT_SIZE;
+      }
+    }
+  }
 
   if (iteration <= MAX_ITERATIONS) {
     const frs = [];
@@ -189,7 +175,7 @@ function frame() {
         fas.push({fa_x, fa_y});
     }
 
-    const cooling_factor = lerp(1, 0, step * iteration);
+    const cooling_factor = lerp(1, 0, STEP * iteration);
     for (let i = 0; i < nodes.length; i++) {
       nodes[i].position.x += (frs[i].fr_x + fas[i].fa_x) * (dt*speed) * cooling_factor;
       nodes[i].position.y += (frs[i].fr_y + fas[i].fa_y) * (dt*speed) * cooling_factor;
@@ -258,16 +244,34 @@ json = `{
     }
 }`;
 
+function screenCoordToWorldCoord(pos) {
+  return {x: (pos.x - originX)/scale, y: (pos.y - originY)/scale};
+}
+
 function main() {
   canvas.width = window.innerWidth;
   canvas.height = window.innerHeight;
 
   canvas.addEventListener("mousemove", (e) => {
+    const mousePos = { x: e.offsetX, y: e.offsetY };
+
     if (nodes.length) {
       for (const node of nodes) {
-        node.is_hovered = dist({x: e.offsetX, y: e.offsetY}, node.position) < RADIUS;
+        node.is_hovered = dist(screenCoordToWorldCoord(mousePos), node.position) < RADIUS;
       }
     }
+  })
+
+  canvas.addEventListener("wheel", (e) => {
+    e.preventDefault();
+    const x = e.offsetX;
+    const y = e.offsetY;
+
+    zoom = 1 + (-e.deltaY * 0.01);
+    originX = x - (x - originX) * zoom;
+    originY = y - (y - originY) * zoom;
+
+    scale *= zoom;
   })
 
   const root = parse_object(json);
@@ -285,7 +289,7 @@ function main() {
       const node = {};
       node['type'] = "object";
       node['value'] = {};
-      node['position'] = { x: canvas.width / 2 + r * Math.cos(rad), y: canvas.height / 2 + r * Math.sin(rad)};
+      node['position'] = { x: (canvas.width / 2 + r * Math.cos(rad)), y: (canvas.height / 2 + r * Math.sin(rad))};
 
       for (const [k, v] of Object.entries(value)) {
         node['value'][k] = dfs(v, level + 1);
@@ -298,7 +302,7 @@ function main() {
       const node = {};
       node['type'] = "array";
       node['value'] = [];
-      node['position'] = { x: canvas.width / 2 + r * Math.cos(rad), y: canvas.height / 2 + r * Math.sin(rad)};
+      node['position'] = { x: (canvas.width / 2 + r * Math.cos(rad)), y: (canvas.height / 2 + r * Math.sin(rad))};
 
       for (const arrayItem of value) {
         node['value'].push(dfs(arrayItem, level + 1));
@@ -309,9 +313,7 @@ function main() {
   }
 
   graph = dfs(root, 0);
-
   requestAnimationFrame(frame);
-
   window.addEventListener('resize', resizeCanvas, false);
 
   function resizeCanvas() {
