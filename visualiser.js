@@ -327,7 +327,7 @@ function setup() {
     canvas.width = parent.clientWidth;
     canvas.height = parent.clientHeight;
 
-    visualize();
+    if (root) visualize();
   }
 }
 
