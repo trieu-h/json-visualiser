@@ -333,6 +333,7 @@ function setup() {
 
 setup();
 
+let this_frame = null;
 function run() {
   json = input.value;
   pos  = 0; // Reset parser position;
@@ -376,6 +377,11 @@ function run() {
   }
 
   graph = dfs(root, 0);
-  requestAnimationFrame(frame);
+  iteration = 0;
+  if (this_frame) {
+    cancelAnimationFrame(this_frame);
+  } else {
+    this_frame = requestAnimationFrame(frame);
+  }
 }
 
