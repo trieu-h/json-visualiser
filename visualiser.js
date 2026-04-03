@@ -4,6 +4,79 @@ if (!ctx) throw("Error: Could not initialize 2d context");
 
 let graph;
 
+class Vector2 {
+  constructor(x = 0, y = 0) {
+    this.x = x;
+    this.y = y;
+  }
+
+  add(v) {
+    return new Vector2(this.x + v.x, this.y + v.y);
+  }
+
+  sub(v) {
+    return new Vector2(this.x - v.x, this.y - v.y);
+  }
+
+  mul(s) {
+    return new Vector2(this.x * s, this.y * s);
+  }
+
+  div(s) {
+    return new Vector2(this.x / s, this.y / s);
+  }
+
+  addInPlace(v) {
+    this.x += v.x;
+    this.y += v.y;
+    return this;
+  }
+
+  subInPlace(v) {
+    this.x -= v.x;
+    this.y -= v.y;
+    return this;
+  }
+
+  mulInPlace(s) {
+    this.x *= s;
+    this.y *= s;
+    return this;
+  }
+
+  divInPlace(s) {
+    this.x /= s;
+    this.y /= s;
+    return this;
+  }
+
+  lengthSq() {
+    return this.x * this.x + this.y * this.y;
+  }
+
+  distSq(v) {
+    const dx = this.x - v.x;
+    const dy = this.y - v.y;
+    return dx * dx + dy * dy;
+  }
+
+  dist(v) {
+    return Math.sqrt(this.distSq(v));
+  }
+
+  clone() {
+    return new Vector2(this.x, this.y);
+  }
+
+  static lerp(a, b, t) {
+    return new Vector2(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t);
+  }
+
+  static dist(a, b) {
+    return a.dist(b);
+  }
+}
+
 const POINT_COLOR = "#dc322f";
 const TEXT_COLOR  = "#cb4b16";
 const LINE_TEXT_COLOR = "#d33682";
@@ -14,48 +87,50 @@ const STEP = 1 / MAX_ITERATIONS;
 const EPSILON = 10;
 let RADIUS = 10;
 let IDEAL_DISTANCE = 70;
-let FONT_SIZE = 15;
-let LINE_FONT_SIZE = 13;
+let FONT_SIZE = 13;
 let BOX_PADDING = 10;
 
-function lerp(x, y, t) {
-  return x + (y - x) * t;
+function lerp(a, b, t) {
+  return a + (b - a) * t;
 }
 
-function drawLine(startPos, endPos, lineWidth = 1) {
+function draw_line(start, end, lineWidth = 1) {
   ctx.beginPath();
-  ctx.moveTo(startPos.x, startPos.y);
-  ctx.lineTo(endPos.x, endPos.y);
+  ctx.moveTo(start.x, start.y);
+  ctx.lineTo(end.x, end.y);
   ctx.strokeStyle = LINE_COLOR;
   ctx.lineWidth = lineWidth;
   ctx.stroke();
 }
 
-function dist(pos1, pos2) {
-  return Math.hypot(pos2.x - pos1.x, pos2.y - pos1.y);
+function dist(a, b) {
+  return a.dist(b);
 }
 
-function connectCircle(pos1, r1, pos2, r2) {
-  const distance = dist(pos1, pos2);
-  const start_x = pos1.x + (r1 * (pos2.x - pos1.x)) / distance;
-  const start_y = pos1.y + (r1 * (pos2.y - pos1.y)) / distance;
-  const end_x = pos2.x - (r2 * (pos2.x - pos1.x)) / distance;
-  const end_y = pos2.y - (r2 * (pos2.y - pos1.y)) / distance;
-  drawLine({ x: start_x, y: start_y }, { x: end_x, y: end_y });
+function connectCircle(a, r1, b, r2) {
+  const d = dist(a, b);
+  const start = new Vector2(
+    a.x + (r1 * (b.x - a.x)) / d,
+    a.y + (r1 * (b.y - a.y)) / d
+  );
+  const end = new Vector2(
+    b.x - (r2 * (b.x - a.x)) / d,
+    b.y - (r2 * (b.y - a.y)) / d
+  );
+  draw_line(start, end);
 }
 
-function drawRect(pos, w, h) {
+function draw_rect(pos, w, h) {
   ctx.fillStyle = BOX_COLOR;
   ctx.fillRect(pos.x, pos.y, w, h);
 }
 
-function drawText(x, y, text, color, font_size) {
-  ctx.font = `${font_size}px serif`;
+function draw_text(pos, text, color) {
   ctx.fillStyle = color;
-  ctx.fillText(text, x, y);
+  ctx.fillText(text, pos.x, pos.y);
 }
 
-function drawCircle(ctx, pos, radius, color) {
+function draw_circle(ctx, pos, radius, color) {
   ctx.save();
   ctx.beginPath();
   ctx.arc(pos.x, pos.y, radius, 0, 2 * Math.PI, false);
@@ -71,8 +146,7 @@ let dt = null;
 let speed = 0.0002;
 let iteration = 0;
 let nodes = [];
-let originX = 0;
-let originY = 0;
+let origin = new Vector2(0, 0);
 let scale = 1;
 let zoom = 0;
 
@@ -86,20 +160,22 @@ function frame() {
 
   ctx.setTransform(1, 0, 0, 1, 0, 0); // Reset everything to default state
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  ctx.translate(originX, originY);
+  ctx.translate(origin.x, origin.y);
   ctx.scale(scale, scale);
+  ctx.font = `${FONT_SIZE}px serif`;
 
   const draw = (node, parent) => {
     node.adjacents = [];
     nodes.push(node);
 
-    drawCircle(ctx, node.position, RADIUS, POINT_COLOR);
+    draw_circle(ctx, node.position, RADIUS, POINT_COLOR);
 
     for (const [key, value] of Object.entries(node.value)) {
       if (value.type === "object" || value.type === "array") {
         draw(value, node);
         connectCircle(node.position, RADIUS, value.position, RADIUS);
-        drawText(lerp(node.position.x, value.position.x, 0.5), lerp(node.position.y, value.position.y, 0.5), key, LINE_TEXT_COLOR, LINE_FONT_SIZE);
+        const mid = Vector2.lerp(node.position, value.position, 0.5);
+        draw_text(mid, key, LINE_TEXT_COLOR);
         node.adjacents.push(value);
       }
     }
@@ -139,10 +215,11 @@ function frame() {
 
       const max_text_w = Math.max(...texts.map(t => ctx.measureText(t).width)) + BOX_PADDING * 2;
       const max_text_h = texts.length * FONT_SIZE + BOX_PADDING * 2;
-      drawRect({x: node.position.x, y: node.position.y}, max_text_w, max_text_h);
-      y_pos = node.position.y + FONT_SIZE + BOX_PADDING;
+      draw_rect(node.position, max_text_w, max_text_h);
+
+      let y_pos = node.position.y + FONT_SIZE + BOX_PADDING;
       for (const text of texts) {
-        drawText(node.position.x + BOX_PADDING, y_pos, text, TEXT_COLOR);
+        draw_text(new Vector2(node.position.x + BOX_PADDING, y_pos), text, TEXT_COLOR);
         y_pos += FONT_SIZE;
       }
     }
@@ -154,37 +231,31 @@ function frame() {
 
     for (let i = 0; i < nodes.length; i++) {
         // fr: Repulsive force between one vertex against all the other vertices
-        let fr_x = 0;
-        let fr_y = 0;
+        let fr = new Vector2(0, 0);
         for (let j = 0; j < nodes.length; j++) {
           if (j == i) continue;
-          const dx = nodes[i].position.x - nodes[j].position.x;
-          const dy = nodes[i].position.y - nodes[j].position.y;
-          const dist = Math.sqrt(dx*dx + dy*dy + EPSILON);
-          const fr = IDEAL_DISTANCE*IDEAL_DISTANCE / dist;
-          fr_x += (fr * dx) / dist;
-          fr_y += (fr * dy) / dist;
+          const delta = nodes[i].position.sub(nodes[j].position);
+          const dist = Math.sqrt(delta.lengthSq() + EPSILON);
+          const force = IDEAL_DISTANCE * IDEAL_DISTANCE / dist;
+          fr.addInPlace(delta.mul(force / dist));
         }
-        frs.push({fr_x, fr_y});
+        frs.push(fr);
 
         // fa: Attraction force between adjacent nodes
-        let fa_x = 0;
-        let fa_y = 0;
+        let fa = new Vector2(0, 0);
         for (const v_adj of nodes[i].adjacents) {
-          const dx = v_adj.position.x - nodes[i].position.x;
-          const dy = v_adj.position.y - nodes[i].position.y;
-          const dist = Math.sqrt(dx*dx + dy*dy + EPSILON);
-          const fa = dist*dist / IDEAL_DISTANCE;
-          fa_x += (fa * dx) / dist;
-          fa_y += (fa * dy) / dist;
+          const delta = v_adj.position.sub(nodes[i].position);
+          const dist = Math.sqrt(delta.lengthSq() + EPSILON);
+          const force = dist * dist / IDEAL_DISTANCE;
+          fa.addInPlace(delta.mul(force / dist));
         }
-        fas.push({fa_x, fa_y});
+        fas.push(fa);
     }
 
     const cooling_factor = lerp(1, 0, STEP * iteration);
     for (let i = 0; i < nodes.length; i++) {
-      nodes[i].position.x += (frs[i].fr_x + fas[i].fa_x) * (dt*speed) * cooling_factor;
-      nodes[i].position.y += (frs[i].fr_y + fas[i].fa_y) * (dt*speed) * cooling_factor;
+      const totalForce = frs[i].add(fas[i]);
+      nodes[i].position.addInPlace(totalForce.mul(dt * speed * cooling_factor));
     }
     iteration += 1;
   }
@@ -251,7 +322,7 @@ json = `{
 }`;
 
 function screenCoordToWorldCoord(pos) {
-  return {x: (pos.x - originX)/scale, y: (pos.y - originY)/scale};
+  return new Vector2((pos.x - origin.x) / scale, (pos.y - origin.y) / scale);
 }
 
 function main() {
@@ -263,7 +334,7 @@ function main() {
 
   canvas.addEventListener("mousedown", (e) => {
     isPanning = true;
-    lastMousePos = { x: e.offsetX, y: e.offsetY };
+    lastMousePos = new Vector2(e.offsetX, e.offsetY);
   })
 
   canvas.addEventListener("mouseup", (e) => {
@@ -271,11 +342,10 @@ function main() {
   })
 
   canvas.addEventListener("mousemove", (e) => {
-    const mousePos = { x: e.offsetX, y: e.offsetY };
+    const mousePos = new Vector2(e.offsetX, e.offsetY);
 
     if (isPanning) {
-      originX += mousePos.x - lastMousePos.x;
-      originY += mousePos.y - lastMousePos.y;
+      origin.addInPlace(mousePos.sub(lastMousePos));
       lastMousePos = mousePos;
     }
 
@@ -288,12 +358,11 @@ function main() {
 
   canvas.addEventListener("wheel", (e) => {
     e.preventDefault();
-    const x = e.offsetX;
-    const y = e.offsetY;
+    const mouse = new Vector2(e.offsetX, e.offsetY);
 
     zoom = 1 + (-e.deltaY * 0.01);
-    originX = x - (x - originX) * zoom;
-    originY = y - (y - originY) * zoom;
+    origin.x = mouse.x - (mouse.x - origin.x) * zoom;
+    origin.y = mouse.y - (mouse.y - origin.y) * zoom;
 
     scale *= zoom;
   })
@@ -313,7 +382,7 @@ function main() {
       const node = {};
       node['type'] = "object";
       node['value'] = {};
-      node['position'] = { x: (canvas.width / 2 + r * Math.cos(rad)), y: (canvas.height / 2 + r * Math.sin(rad))};
+      node['position'] = new Vector2(canvas.width / 2 + r * Math.cos(rad), canvas.height / 2 + r * Math.sin(rad));
 
       for (const [k, v] of Object.entries(value)) {
         node['value'][k] = dfs(v, level + 1);
@@ -326,7 +395,7 @@ function main() {
       const node = {};
       node['type'] = "array";
       node['value'] = [];
-      node['position'] = { x: (canvas.width / 2 + r * Math.cos(rad)), y: (canvas.height / 2 + r * Math.sin(rad))};
+      node['position'] = new Vector2(canvas.width / 2 + r * Math.cos(rad), canvas.height / 2 + r * Math.sin(rad));
 
       for (const arrayItem of value) {
         node['value'].push(dfs(arrayItem, level + 1));
