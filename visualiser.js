@@ -325,9 +325,12 @@ function screenCoordToWorldCoord(pos) {
   return new Vector2((pos.x - origin.x) / scale, (pos.y - origin.y) / scale);
 }
 
-function main() {
-  canvas.width = window.innerWidth;
-  canvas.height = window.innerHeight;
+function setup() {
+  const canvasElem = document.getElementById("canvas");
+  if (!canvasElem) throw new Error("oh oh");
+  const { width, height } = canvasElem.getBoundingClientRect();
+  canvas.width = width;
+  canvas.height = height;
 
   let isPanning = false;
   let lastMousePos = null;
@@ -366,6 +369,23 @@ function main() {
 
     scale *= zoom;
   })
+
+  // window.addEventListener('resize', resizeCanvas, false);
+  //
+  // function resizeCanvas() {
+  //   const parent = canvas.parentElement;
+  //   canvas.width = parent.clientWidth;
+  //   canvas.height = parent.clientHeight;
+  //
+  //   requestAnimationFrame(frame);
+  // }
+}
+
+setup();
+
+function run() {
+  json = input.value;
+  pos  = 0; // Reset parser position;
 
   const root = parse_object(json);
 
@@ -407,15 +427,5 @@ function main() {
 
   graph = dfs(root, 0);
   requestAnimationFrame(frame);
-  window.addEventListener('resize', resizeCanvas, false);
-
-  function resizeCanvas() {
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-
-    requestAnimationFrame(frame);
-  }
 }
-
-main();
 

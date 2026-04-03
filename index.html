@@ -1,19 +1,78 @@
 <!DOCTYPE html>
   <head>
     <title>Force-Directed Graph</title>
+    <link rel="stylesheet" href="reset.css">
     <style>
       body {
         margin: 0;
         padding: 0;
         overflow: hidden;
+        height: 100dvh;
+        width: 100%;
       }
+
       #canvas {
         display: block;
+      }
+
+      .wrapper {
+        display: flex;
+        height: 100%;
+
+        .left {
+          padding: 20px;
+          position: relative;
+          min-width: 300px;
+          background: #2aa198;
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+
+          .line {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+          }
+
+          textarea {
+            width: 100%;
+            height: 100%;
+            background: #6c71c4;
+            color: white;
+            border-left: 2px solid #2aa198;
+            border-right: 2px solid #2aa198;
+          }
+        }
+
+        .right {
+          flex: 1;
+        }
+
+        canvas {
+          height: 100%;
+          width: 100%;
+        }
+
+        .instruction {
+          color: #eee8d5;
+          font-weight: bold;
+        }
       }
     </style>
   </head>
   <body>
-    <canvas id="canvas"></canvas>
+    <div class="wrapper">
+      <div class="left">
+        <div class="line">
+          <p class="instruction">PASTE YOUR JSON HERE</p>
+          <button onclick="run()">Run</button>
+        </div>
+        <textarea id="input"></textarea>
+      </div>
+      <div class="right">
+        <canvas id="canvas"></canvas>
+      </div>
+    </div>
     <script src="parser.js"></script>
     <script src="visualiser.js"></script>
   </body>
