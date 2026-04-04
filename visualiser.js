@@ -86,7 +86,7 @@ const MAX_ITERATIONS = 1000;
 const STEP = 1 / MAX_ITERATIONS;
 const EPSILON = 10;
 let RADIUS = 10;
-let IDEAL_DISTANCE = 70;
+let IDEAL_DISTANCE = 200;
 let FONT_SIZE = 13;
 let BOX_PADDING = 10;
 
@@ -143,7 +143,7 @@ function draw_circle(ctx, pos, radius, color) {
 
 let prev_time = null;
 let dt = null;
-let speed = 0.0002;
+let speed = 0.2;
 let iteration = 0;
 let nodes = [];
 let origin = new Vector2(0, 0);
@@ -226,36 +226,35 @@ function frame() {
   }
 
   if (iteration <= MAX_ITERATIONS) {
-    const frs = [];
-    const fas = [];
+    // Eades Spring Embedder
+    const REPULSION = 2;
+    const SPRING = 1;
+
+    const totalForce = nodes.map(() => new Vector2(0, 0));
 
     for (let i = 0; i < nodes.length; i++) {
         // fr: Repulsive force between one vertex against all the other vertices
-        let fr = new Vector2(0, 0);
         for (let j = 0; j < nodes.length; j++) {
-          if (j == i) continue;
-          const delta = nodes[i].position.sub(nodes[j].position);
-          const dist = Math.sqrt(delta.lengthSq() + EPSILON);
-          const force = IDEAL_DISTANCE * IDEAL_DISTANCE / dist;
-          fr.addInPlace(delta.mul(force / dist));
+          if (j === i) continue;
+          const ij_vec = nodes[i].position.sub(nodes[j].position);
+          const distSq = nodes[i].position.distSq(nodes[j].position);
+          const force  = ij_vec.mul(REPULSION / distSq);
+          totalForce[i].addInPlace(force);
+          totalForce[j].subInPlace(force);
         }
-        frs.push(fr);
 
         // fa: Attraction force between adjacent nodes
-        let fa = new Vector2(0, 0);
-        for (const v_adj of nodes[i].adjacents) {
-          const delta = v_adj.position.sub(nodes[i].position);
-          const dist = Math.sqrt(delta.lengthSq() + EPSILON);
-          const force = dist * dist / IDEAL_DISTANCE;
-          fa.addInPlace(delta.mul(force / dist));
+        for (const j of nodes[i].adjacents) {
+          const ji_vec = j.position.sub(nodes[i].position);
+          const dist = j.position.dist(nodes[i].position);
+          f_spring = ji_vec.mul(SPRING * Math.log(dist /IDEAL_DISTANCE));
+          totalForce[i].addInPlace(f_spring);
         }
-        fas.push(fa);
     }
 
     const cooling_factor = lerp(1, 0, STEP * iteration);
     for (let i = 0; i < nodes.length; i++) {
-      const totalForce = frs[i].add(fas[i]);
-      nodes[i].position.addInPlace(totalForce.mul(dt * speed * cooling_factor));
+      nodes[i].position.addInPlace(totalForce[i].mul(dt * speed * cooling_factor));
     }
     iteration += 1;
   }
